@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { rollosApi } from "../api/rollosApi";
+
+// Configuración base de axios
+axios.defaults.baseURL = "http://localhost:8000";
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+axios.defaults.headers.common['Accept'] = 'application/json';
 
 export default function ListaRollos() {
   const [rollos, setRollos] = useState([]);
@@ -24,14 +30,19 @@ export default function ListaRollos() {
     filtrarRollos();
   }, [rollos, terminoBusqueda, ordenarPor, direccionOrden]);
 
-  const cargarRollos = () => {
-    axios.get("http://localhost:8001/rollos/")
-      .then((res) => setRollos(res.data))
-      .catch((err) => {
-        setErrorMessage("Error al obtener rollos");
-        setShowError(true);
-        console.error("Error al obtener rollos", err);
-      });
+  const cargarRollos = async () => {
+    try {
+      const response = await rollosApi.fetchRollos();
+      const rollosNormalizados = response.data.map(rollo => ({
+        ...rollo,
+        disponible: rollo.disponible !== false
+      }));
+      setRollos(rollosNormalizados);
+    } catch (err) {
+      console.error("Error al obtener rollos:", err);
+      setErrorMessage("Error al cargar los rollos. Verifica la conexión con el servidor.");
+      setShowError(true);
+    }
   };
 
   const filtrarRollos = () => {
@@ -46,7 +57,8 @@ export default function ListaRollos() {
           rollo.tipo_tela,
           rollo.color,
           rollo.metraje?.toString(),
-          rollo.fecha
+          rollo.fecha,
+          rollo.disponible ? "disponible" : "no disponible"
         ];
 
         let formatosFecha = [];
@@ -55,16 +67,35 @@ export default function ListaRollos() {
         }
 
         const todosCampos = [...campos, ...formatosFecha];
-
-        return todosCampos.some(campo =>
-          campo && campo.toString().toLowerCase().includes(termino)
-        );
+        return todosCampos.some(campo => campo && campo.toString().toLowerCase().includes(termino));
       });
     }
 
     resultados.sort((a, b) => {
-      const campoA = ordenarPor === "fecha" ? new Date(a.fecha) : a.id;
-      const campoB = ordenarPor === "fecha" ? new Date(b.fecha) : b.id;
+      let campoA, campoB;
+      
+      switch (ordenarPor) {
+        case "fecha":
+          campoA = new Date(a.fecha);
+          campoB = new Date(b.fecha);
+          break;
+        case "disponible":
+          campoA = a.disponible;
+          campoB = b.disponible;
+          break;
+        case "numero_rollo":
+          // Ordenar por número de rollo - convertir a número para ordenamiento numérico
+          campoA = parseInt(a.numero_rollo) || 0;
+          campoB = parseInt(b.numero_rollo) || 0;
+          break;
+        case "metraje":
+          campoA = parseFloat(a.metraje) || 0;
+          campoB = parseFloat(b.metraje) || 0;
+          break;
+        default:
+          campoA = a.id;
+          campoB = b.id;
+      }
 
       if (campoA < campoB) return direccionOrden === "asc" ? -1 : 1;
       if (campoA > campoB) return direccionOrden === "asc" ? 1 : -1;
@@ -125,14 +156,14 @@ export default function ListaRollos() {
 
   const confirmarEliminacion = async () => {
     try {
-      await axios.delete(`http://localhost:8001/rollos/${rolloAEliminar}/`);
+      await axios.delete(`/rollos/${rolloAEliminar}/`);
       setSuccessMessage("Rollo eliminado correctamente");
       setShowSuccess(true);
-      cargarRollos();
+      await cargarRollos();
     } catch (err) {
+      console.error("Error al eliminar:", err.response?.data || err.message);
       setErrorMessage("Error al eliminar el rollo");
       setShowError(true);
-      console.error(err);
     } finally {
       setShowDeleteConfirm(false);
       setRolloAEliminar(null);
@@ -141,7 +172,10 @@ export default function ListaRollos() {
 
   const iniciarEdicion = (rollo) => {
     setEditando(rollo.id);
-    setRolloEditado({ ...rollo });
+    setRolloEditado({ 
+      ...rollo,
+      disponible: rollo.disponible !== false
+    });
   };
 
   const cancelarEdicion = () => {
@@ -151,26 +185,28 @@ export default function ListaRollos() {
 
   const guardarEdicion = async () => {
     try {
-      await axios.put(`http://localhost:8001/rollos/${editando}/`, {
+      await axios.put(`/rollos/${editando}/`, {
         ...rolloEditado,
         metraje: parseFloat(rolloEditado.metraje),
+        disponible: rolloEditado.disponible === true
       });
       setSuccessMessage("Rollo actualizado correctamente");
       setShowSuccess(true);
       setEditando(null);
       setRolloEditado({});
-      cargarRollos();
+      await cargarRollos();
     } catch (err) {
+      console.error("Error al actualizar:", err.response?.data || err.message);
       setErrorMessage("Error al actualizar el rollo");
       setShowError(true);
-      console.error(err);
     }
   };
 
   const handleInputChange = (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setRolloEditado({
       ...rolloEditado,
-      [e.target.name]: e.target.value
+      [e.target.name]: value
     });
   };
 
@@ -183,7 +219,7 @@ export default function ListaRollos() {
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Buscar por número, lote, tipo de tela, color o fecha..."
+            placeholder="Buscar por número, lote, tipo de tela, color, fecha, metraje o disponibilidad..."
             value={terminoBusqueda}
             onChange={handleBusquedaChange}
             className="w-full p-3 pl-10 bg-gray-800 border border-gray-600 rounded-lg text-white"
@@ -220,7 +256,10 @@ export default function ListaRollos() {
           className="bg-gray-800 text-white border border-gray-600 rounded p-2"
         >
           <option value="id">ID</option>
+          <option value="numero_rollo">Número de Orden</option>
           <option value="fecha">Fecha</option>
+          <option value="metraje">Metraje</option>
+          <option value="disponible">Disponibilidad</option>
         </select>
         <button
           onClick={() => setDireccionOrden(prev => (prev === "asc" ? "desc" : "asc"))}
@@ -252,6 +291,7 @@ export default function ListaRollos() {
               <th className="p-3">Color</th>
               <th className="p-3">Fecha</th>
               <th className="p-3">Metraje</th>
+              <th className="p-3">Disponible</th>
               <th className="p-3">Acciones</th>
             </tr>
           </thead>
@@ -318,6 +358,15 @@ export default function ListaRollos() {
                       />
                     </td>
                     <td className="p-2">
+                      <input
+                        type="checkbox"
+                        name="disponible"
+                        checked={rolloEditado.disponible || false}
+                        onChange={handleInputChange}
+                        className="h-5 w-5"
+                      />
+                    </td>
+                    <td className="p-2">
                       <div className="flex gap-2">
                         <button
                           onClick={guardarEdicion}
@@ -346,6 +395,13 @@ export default function ListaRollos() {
                     </td>
                     <td className="p-3">{rollo.fecha}</td>
                     <td className="p-3">{rollo.metraje} m</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-1 rounded-full text-sm ${
+                        rollo.disponible ? 'bg-green-600' : 'bg-red-600'
+                      }`}>
+                        {rollo.disponible ? 'Sí' : 'No'}
+                      </span>
+                    </td>
                     <td className="p-3">
                       <div className="flex gap-2">
                         <button
