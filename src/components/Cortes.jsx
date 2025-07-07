@@ -16,17 +16,73 @@ export default function Cortes() {
   const [numerosEditados, setNumerosEditados] = useState({});
   const [resultado, setResultado] = useState(null);
 
+  // Estados para autocompletado
+  const [tiposTela, setTiposTela] = useState([]);
+  const [colores, setColores] = useState([]);
+  const [mostrarSugerenciasTela, setMostrarSugerenciasTela] = useState(false);
+  const [mostrarSugerenciasColor, setMostrarSugerenciasColor] = useState(false);
+  const [sugerenciasTela, setSugerenciasTela] = useState([]);
+  const [sugerenciasColor, setSugerenciasColor] = useState([]);
+
   useEffect(() => {
     const fetchRollos = async () => {
       try {
         const res = await axios.get("/rollos/");
         setRollos(res.data);
+        
+        // Extraer tipos de tela únicos
+        const tiposUnicos = [...new Set(res.data.map(r => r.tipo_tela).filter(Boolean))];
+        setTiposTela(tiposUnicos);
+        
+        // Extraer colores únicos
+        const coloresUnicos = [...new Set(res.data.map(r => r.color).filter(Boolean))];
+        setColores(coloresUnicos);
       } catch (error) {
         console.error("Error al obtener rollos:", error);
       }
     };
     fetchRollos();
   }, []);
+
+  const handleTipoTelaChange = (e) => {
+    const valor = e.target.value;
+    setTipoTela(valor);
+    
+    if (valor.length > 0) {
+      const filtradas = tiposTela.filter(tipo => 
+        tipo.toLowerCase().includes(valor.toLowerCase())
+      );
+      setSugerenciasTela(filtradas);
+      setMostrarSugerenciasTela(true);
+    } else {
+      setMostrarSugerenciasTela(false);
+    }
+  };
+
+  const handleColorChange = (e) => {
+    const valor = e.target.value;
+    setColor(valor);
+    
+    if (valor.length > 0) {
+      const filtradas = colores.filter(color => 
+        color.toLowerCase().includes(valor.toLowerCase())
+      );
+      setSugerenciasColor(filtradas);
+      setMostrarSugerenciasColor(true);
+    } else {
+      setMostrarSugerenciasColor(false);
+    }
+  };
+
+  const seleccionarTipoTela = (tipo) => {
+    setTipoTela(tipo);
+    setMostrarSugerenciasTela(false);
+  };
+
+  const seleccionarColor = (color) => {
+    setColor(color);
+    setMostrarSugerenciasColor(false);
+  };
 
   const verificarDisponibilidad = () => {
     const disponibles = rollos
@@ -134,20 +190,72 @@ export default function Cortes() {
       <div className="w-full max-w-xl bg-gray-800 p-6 rounded-lg shadow-lg space-y-4">
         <h1 className="text-2xl font-bold text-center">Verificar Corte de Tela</h1>
 
-        <input
-          type="text"
-          placeholder="Tipo de tela (ej. gabardina)"
-          value={tipoTela}
-          onChange={(e) => setTipoTela(e.target.value)}
-          className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Color (ej. azul)"
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-          className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
-        />
+        {/* Campo Tipo de Tela con Autocompletado */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Tipo de tela (ej. gabardina)"
+            value={tipoTela}
+            onChange={handleTipoTelaChange}
+            onFocus={() => {
+              if (tipoTela.length > 0) {
+                setMostrarSugerenciasTela(true);
+              }
+            }}
+            onBlur={() => {
+              // Delay para permitir clic en sugerencias
+              setTimeout(() => setMostrarSugerenciasTela(false), 200);
+            }}
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
+          />
+          {mostrarSugerenciasTela && sugerenciasTela.length > 0 && (
+            <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-b-lg shadow-lg max-h-40 overflow-y-auto">
+              {sugerenciasTela.map((tipo, index) => (
+                <div
+                  key={index}
+                  onClick={() => seleccionarTipoTela(tipo)}
+                  className="p-2 hover:bg-gray-600 cursor-pointer border-b border-gray-600 last:border-b-0"
+                >
+                  {tipo}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Campo Color con Autocompletado */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Color (ej. azul)"
+            value={color}
+            onChange={handleColorChange}
+            onFocus={() => {
+              if (color.length > 0) {
+                setMostrarSugerenciasColor(true);
+              }
+            }}
+            onBlur={() => {
+              // Delay para permitir clic en sugerencias
+              setTimeout(() => setMostrarSugerenciasColor(false), 200);
+            }}
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
+          />
+          {mostrarSugerenciasColor && sugerenciasColor.length > 0 && (
+            <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-b-lg shadow-lg max-h-40 overflow-y-auto">
+              {sugerenciasColor.map((color, index) => (
+                <div
+                  key={index}
+                  onClick={() => seleccionarColor(color)}
+                  className="p-2 hover:bg-gray-600 cursor-pointer border-b border-gray-600 last:border-b-0"
+                >
+                  {color}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <input
           type="number"
           placeholder="Metros requeridos (ej. 150)"
