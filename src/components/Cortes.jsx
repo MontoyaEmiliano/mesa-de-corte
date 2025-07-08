@@ -85,6 +85,35 @@ export default function Cortes() {
   };
 
   const verificarDisponibilidad = () => {
+    // Validar que todos los campos estén llenos
+    if (!tipoTela.trim()) {
+      setResultado("⚠️ Por favor, ingresa el tipo de tela.");
+      setRollosFiltrados([]);
+      setRollosSeleccionados([]);
+      setRollosUsados([]);
+      setNumerosEditados({});
+      return;
+    }
+
+    if (!color.trim()) {
+      setResultado("⚠️ Por favor, ingresa el color.");
+      setRollosFiltrados([]);
+      setRollosSeleccionados([]);
+      setRollosUsados([]);
+      setNumerosEditados({});
+      return;
+    }
+
+    const requerido = parseFloat(metrosRequeridos);
+    if (!metrosRequeridos.trim() || isNaN(requerido) || requerido <= 0) {
+      setResultado("⚠️ Por favor, ingresa una cantidad válida de metros.");
+      setRollosFiltrados([]);
+      setRollosSeleccionados([]);
+      setRollosUsados([]);
+      setNumerosEditados({});
+      return;
+    }
+
     const disponibles = rollos
       .filter(
         (r) =>
@@ -93,16 +122,6 @@ export default function Cortes() {
           r.color?.toLowerCase().includes(color.toLowerCase())
       )
       .sort((a, b) => parseFloat(b.metraje) - parseFloat(a.metraje));
-
-    const requerido = parseFloat(metrosRequeridos);
-    if (isNaN(requerido) || requerido <= 0) {
-      setResultado("⚠️ Ingresa una cantidad válida de metros.");
-      setRollosFiltrados([]);
-      setRollosSeleccionados([]);
-      setRollosUsados([]);
-      setNumerosEditados({});
-      return;
-    }
 
     if (disponibles.length === 0) {
       setResultado("❌ No hay rollos disponibles que coincidan con los filtros.");
@@ -113,11 +132,22 @@ export default function Cortes() {
       return;
     }
 
+    // Calcular suma total de metros disponibles
+    const totalMetrosDisponibles = disponibles.reduce((acc, r) => acc + parseFloat(r.metraje), 0);
+    
     setRollosFiltrados(disponibles);
     setRollosSeleccionados([]);
     setRollosUsados([]);
     setNumerosEditados({});
-    setResultado(`Selecciona manualmente los rollos hasta alcanzar al menos ${requerido} metros.`);
+    
+    // Mostrar resultado con información completa
+    const suficiente = totalMetrosDisponibles >= requerido;
+    const icono = suficiente ? "✅" : "⚠️";
+    const estado = suficiente ? "Suficiente disponible" : "No hay suficientes metros";
+    
+    setResultado(
+      `${icono} ${estado} - Total disponible: ${totalMetrosDisponibles.toFixed(2)} m | Requerido: ${requerido} m | Rollos encontrados: ${disponibles.length}`
+    );
   };
 
   const toggleSeleccion = (rollo) => {
@@ -265,7 +295,12 @@ export default function Cortes() {
         />
         <button
           onClick={verificarDisponibilidad}
-          className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-semibold"
+          disabled={!tipoTela.trim() || !color.trim() || !metrosRequeridos.trim() || parseFloat(metrosRequeridos) <= 0}
+          className={`w-full px-4 py-2 rounded font-semibold ${
+            !tipoTela.trim() || !color.trim() || !metrosRequeridos.trim() || parseFloat(metrosRequeridos) <= 0
+              ? 'bg-gray-600 cursor-not-allowed text-gray-400'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
           Verificar Disponibilidad
         </button>

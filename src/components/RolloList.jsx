@@ -246,7 +246,7 @@ export default function ListaRollos() {
           </button>
         )}
       </div>
-
+            
       {/* Controles de ordenamiento */}
       <div className="mb-4 flex gap-4 items-center">
         <label className="text-white">Ordenar por:</label>
