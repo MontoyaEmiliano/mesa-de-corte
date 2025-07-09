@@ -1,13 +1,10 @@
-import { useState } from "react";
-import axios from "axios";
+import { useState, useEffect } from "react";
 import { rollosApi } from "../api/rollosApi";
+import { useParams } from "react-router-dom";
 
-// Configuración base de axios
-axios.defaults.baseURL = "http://localhost:8000";
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-axios.defaults.headers.common['Accept'] = 'application/json';
 
 export default function FormularioRollo() {
+  const { clienteId } = useParams();
   const [rollo, setRollo] = useState({
     numero_rollo: "",
     lote: "",
@@ -15,13 +12,55 @@ export default function FormularioRollo() {
     color: "",
     fecha: "",
     metraje: "",
-    disponible: true
+    disponible: true,
+    cliente_id: clienteId
   });
+  const [clientes, setClientes] = useState([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [csvFile, setCsvFile] = useState(null);
   const [isProcessingCSV, setIsProcessingCSV] = useState(false);
+  const [showClienteForm, setShowClienteForm] = useState(false);
+  const [nuevoCliente, setNuevoCliente] = useState("");
+
+  // Cargar clientes al montar el componente
+  useEffect(() => {
+    cargarClientes();
+  }, []);
+
+  const cargarClientes = async () => {
+    try {
+      const response = await rollosApi.fetchClientes();
+      setClientes(response.data);
+    } catch (error) {
+      console.error("Error al cargar clientes:", error);
+      setErrorMessage("Error al cargar la lista de clientes");
+      setShowError(true);
+    }
+  };
+
+  const crearCliente = async () => {
+    if (!nuevoCliente.trim()) {
+      setErrorMessage("El nombre del cliente es requerido");
+      setShowError(true);
+      return;
+    }
+
+    try {
+      const response = await rollosApi.createCliente({
+        nombre: nuevoCliente.trim()
+      });
+      setClientes([...clientes, response.data]);
+      setRollo({ ...rollo, cliente_id: response.data.id });
+      setNuevoCliente("");
+      setShowClienteForm(false);
+    } catch (error) {
+      console.error("Error al crear cliente:", error);
+      setErrorMessage(error.response?.data?.detail || "Error al crear el cliente");
+      setShowError(true);
+    }
+  };
 
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -29,11 +68,18 @@ export default function FormularioRollo() {
   };
 
   const handleSubmit = async () => {
+    if (!rollo.cliente_id) {
+      setErrorMessage("Debe seleccionar un cliente");
+      setShowError(true);
+      return;
+    }
+
     try {
       await rollosApi.createRollo({
         ...rollo,
         metraje: parseFloat(rollo.metraje),
-        disponible: rollo.disponible === true
+        disponible: rollo.disponible === true,
+        cliente_id: parseInt(rollo.cliente_id)
       });
       setShowSuccess(true);
       // Resetear formulario
@@ -44,7 +90,8 @@ export default function FormularioRollo() {
         color: "",
         fecha: "",
         metraje: "",
-        disponible: true
+        disponible: true,
+        cliente_id: clienteId || ""
       });
     } catch (err) {
       console.error("Error al crear rollo:", err);
@@ -66,6 +113,12 @@ export default function FormularioRollo() {
   const processCSV = async () => {
     if (!csvFile) return;
     
+    if (!rollo.cliente_id) {
+      setErrorMessage("Debe seleccionar un cliente antes de procesar el CSV");
+      setShowError(true);
+      return;
+    }
+    
     setIsProcessingCSV(true);
     
     try {
@@ -73,7 +126,7 @@ export default function FormularioRollo() {
       const lines = text.split('\n');
       const headers = lines[0].split(',').map(h => h.trim());
       
-      // Validar headers esperados
+      // Validar headers esperados (sin cliente_id porque se toma del formulario)
       const expectedHeaders = ['numero_rollo', 'lote', 'tipo_tela', 'color', 'fecha', 'metraje', 'disponible'];
       const hasValidHeaders = expectedHeaders.every(header => 
         headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
@@ -99,7 +152,8 @@ export default function FormularioRollo() {
           color: values[3] || "",
           fecha: values[4] || "",
           metraje: parseFloat(values[5]) || 0,
-          disponible: values[6]?.toLowerCase() === 'true' || values[6] === '1'
+          disponible: values[6]?.toLowerCase() === 'true' || values[6] === '1',
+          cliente_id: parseInt(rollo.cliente_id)
         };
         
         rollos.push(rolloData);
@@ -144,16 +198,77 @@ export default function FormularioRollo() {
       <div className="space-y-4 max-w-md w-full relative">
         <h1 className="text-2xl font-bold text-white text-center">Agregar Rollo</h1>
         
+        {/* Selector de Cliente */}
+        <div className="bg-gray-800 p-4 rounded-lg border border-gray-600">
+          <label className="block text-white font-semibold mb-2">Cliente *</label>
+          <div className="flex gap-2">
+            <select
+              name="cliente_id"
+              value={rollo.cliente_id}
+              onChange={handleChange}
+              className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            >
+              <option value="">Seleccionar cliente</option>
+              {clientes.map(cliente => (
+                <option key={cliente.id} value={cliente.id}>
+                  {cliente.nombre}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowClienteForm(true)}
+              className="px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-white text-sm"
+            >
+              Nuevo
+            </button>
+          </div>
+        </div>
+
+        {/* Formulario para nuevo cliente */}
+        {showClienteForm && (
+          <div className="bg-gray-800 p-4 rounded-lg border border-gray-600">
+            <h3 className="text-white font-semibold mb-2">Crear Nuevo Cliente</h3>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Nombre del cliente"
+                value={nuevoCliente}
+                onChange={(e) => setNuevoCliente(e.target.value)}
+                className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-white"
+              />
+              <button
+                onClick={crearCliente}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm"
+              >
+                Crear
+              </button>
+              <button
+                onClick={() => {
+                  setShowClienteForm(false);
+                  setNuevoCliente("");
+                }}
+                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white text-sm"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+        
         {/* Sección de carga masiva CSV */}
         <div className="bg-gray-800 p-4 rounded-lg border border-gray-600">
           <h3 className="text-white font-semibold mb-2">Carga Masiva desde CSV</h3>
+          <p className="text-gray-400 text-sm mb-2">
+            Seleccione primero un cliente. Todos los rollos del CSV se asignarán a ese cliente.
+          </p>
           <div className="space-y-2">
             <input
               id="csvInput"
               type="file"
               accept=".csv"
               onChange={handleFileChange}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+              disabled={!rollo.cliente_id}
+              className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50"
             />
             {csvFile && (
               <div className="flex items-center gap-2">
@@ -206,7 +321,8 @@ export default function FormularioRollo() {
         
         <button 
           onClick={handleSubmit} 
-          className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white"
+          disabled={!rollo.cliente_id}
+          className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-white"
         >
           Agregar Rollo
         </button>

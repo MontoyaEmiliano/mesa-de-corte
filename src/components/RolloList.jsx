@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { rollosApi } from "../api/rollosApi";
-
-// Configuración base de axios
-axios.defaults.baseURL = "http://localhost:8000";
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-axios.defaults.headers.common['Accept'] = 'application/json';
+import { useParams } from "react-router-dom";
 
 export default function ListaRollos() {
+  const { clienteId } = useParams();
   const [rollos, setRollos] = useState([]);
+  const [clientes, setClientes] = useState([]);
   const [rollosFiltrados, setRollosFiltrados] = useState([]);
   const [terminoBusqueda, setTerminoBusqueda] = useState("");
   const [ordenarPor, setOrdenarPor] = useState("id");
@@ -23,24 +20,30 @@ export default function ListaRollos() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    cargarRollos();
-  }, []);
+    cargarDatos();
+  }, [clienteId]);
 
   useEffect(() => {
     filtrarRollos();
   }, [rollos, terminoBusqueda, ordenarPor, direccionOrden]);
 
-  const cargarRollos = async () => {
+  const cargarDatos = async () => {
     try {
-      const response = await rollosApi.fetchRollos();
-      const rollosNormalizados = response.data.map(rollo => ({
+      const [rollosResponse, clientesResponse] = await Promise.all([
+        rollosApi.fetchRollos(clienteId),
+        rollosApi.fetchClientes()
+      ]);
+      
+      const rollosNormalizados = rollosResponse.data.map(rollo => ({
         ...rollo,
         disponible: rollo.disponible !== false
       }));
+      
       setRollos(rollosNormalizados);
+      setClientes(clientesResponse.data);
     } catch (err) {
-      console.error("Error al obtener rollos:", err);
-      setErrorMessage("Error al cargar los rollos. Verifica la conexión con el servidor.");
+      console.error("Error al obtener datos:", err);
+      setErrorMessage("Error al cargar los datos. Verifica la conexión con el servidor.");
       setShowError(true);
     }
   };
@@ -84,7 +87,6 @@ export default function ListaRollos() {
           campoB = b.disponible;
           break;
         case "numero_rollo":
-          // Ordenar por número de rollo - convertir a número para ordenamiento numérico
           campoA = parseInt(a.numero_rollo) || 0;
           campoB = parseInt(b.numero_rollo) || 0;
           break;
@@ -156,10 +158,10 @@ export default function ListaRollos() {
 
   const confirmarEliminacion = async () => {
     try {
-      await axios.delete(`/rollos/${rolloAEliminar}/`);
+      await rollosApi.deleteRollo(rolloAEliminar);
       setSuccessMessage("Rollo eliminado correctamente");
       setShowSuccess(true);
-      await cargarRollos();
+      await cargarDatos();
     } catch (err) {
       console.error("Error al eliminar:", err.response?.data || err.message);
       setErrorMessage("Error al eliminar el rollo");
@@ -174,7 +176,8 @@ export default function ListaRollos() {
     setEditando(rollo.id);
     setRolloEditado({ 
       ...rollo,
-      disponible: rollo.disponible !== false
+      disponible: rollo.disponible !== false,
+      cliente_id: clienteId // Usamos el clienteId de la URL
     });
   };
 
@@ -185,16 +188,17 @@ export default function ListaRollos() {
 
   const guardarEdicion = async () => {
     try {
-      await axios.put(`/rollos/${editando}/`, {
+      await rollosApi.updateRollo(editando, {
         ...rolloEditado,
         metraje: parseFloat(rolloEditado.metraje),
-        disponible: rolloEditado.disponible === true
+        disponible: rolloEditado.disponible === true,
+        cliente_id: parseInt(clienteId)
       });
       setSuccessMessage("Rollo actualizado correctamente");
       setShowSuccess(true);
       setEditando(null);
       setRolloEditado({});
-      await cargarRollos();
+      await cargarDatos();
     } catch (err) {
       console.error("Error al actualizar:", err.response?.data || err.message);
       setErrorMessage("Error al actualizar el rollo");
@@ -214,7 +218,6 @@ export default function ListaRollos() {
 
   return (
     <div className="p-4">
-      {/* Barra de búsqueda */}
       <div className="mb-4 flex gap-2 items-center">
         <div className="relative flex-1">
           <input
@@ -247,7 +250,6 @@ export default function ListaRollos() {
         )}
       </div>
             
-      {/* Controles de ordenamiento */}
       <div className="mb-4 flex gap-4 items-center">
         <label className="text-white">Ordenar por:</label>
         <select
@@ -256,7 +258,7 @@ export default function ListaRollos() {
           className="bg-gray-800 text-white border border-gray-600 rounded p-2"
         >
           <option value="id">ID</option>
-          <option value="numero_rollo">Número de Orden</option>
+          <option value="numero_rollo">Número de Rollo</option>
           <option value="fecha">Fecha</option>
           <option value="metraje">Metraje</option>
           <option value="disponible">Disponibilidad</option>
@@ -269,7 +271,6 @@ export default function ListaRollos() {
         </button>
       </div>
 
-      {/* Información de resultados */}
       {terminoBusqueda && (
         <div className="mb-3 text-sm text-gray-400">
           {rollosFiltrados.length === 0 
@@ -279,7 +280,6 @@ export default function ListaRollos() {
         </div>
       )}
 
-      {/* Tabla de rollos */}
       <div className="overflow-x-auto">
         <table className="w-full text-left mt-4 border border-gray-600">
           <thead className="bg-gray-800">
@@ -433,12 +433,11 @@ export default function ListaRollos() {
         
         {rollos.length === 0 && (
           <div className="text-center py-8 text-gray-400">
-            No hay rollos registrados
+            No hay rollos registrados para este cliente
           </div>
         )}
       </div>
 
-      {/* Modal de confirmación de eliminación */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 p-6 rounded-lg max-w-sm w-full">
@@ -465,7 +464,6 @@ export default function ListaRollos() {
         </div>
       )}
 
-      {/* Modal de éxito */}
       {showSuccess && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 p-6 rounded-lg max-w-sm w-full">
@@ -481,7 +479,6 @@ export default function ListaRollos() {
         </div>
       )}
 
-      {/* Modal de error */}
       {showError && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 p-6 rounded-lg max-w-sm w-full">

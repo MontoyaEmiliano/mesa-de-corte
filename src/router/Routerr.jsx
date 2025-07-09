@@ -1,8 +1,14 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useLocation, Outlet } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Agregar from "../pages/Agregar";
 import Consultar from "../pages/Consultar";
 import CortesPage from "../pages/CortesPage";
+import ClientesPage from "../pages/ClientesPage";
+import ClienteDashboard from "../pages/ClienteDashboard";
+import RolloForm from "../components/RolloForm";
+import RolloList from "../components/RolloList";
+import Cortes from "../components/Cortes";
+import ClienteManager from "../components/ClienteManager";
 
 function NavLink({ to, children, isActive }) {
   return (
@@ -32,54 +38,60 @@ function Navigation() {
   }, []);
 
   const navItems = [
-    { path: '/', label: 'Agregar Rollo' },
-    { path: '/consultar', label: 'Consultar Rollos' },
-    { path: '/cortes', label: 'Cortes' }
+    { path: '/clientes', label: 'Inicio' },
+    //{ path: '/agregar', label: 'Agregar Rollo' },
+    //{ path: '/consultar', label: 'Consultar Rollos' },
+    //{ path: '/cortes', label: 'Cortes' }
   ];
 
+  // Ocultar navegación cuando estamos en el dashboard de un cliente
+  const isClientDashboard = location.pathname.startsWith('/cliente/');
+
   return (
-    <nav className="relative mb-8">
-      {/* Fondo con efecto glassmorphism */}
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-lg rounded-2xl border border-white/10"></div>
-      
-      {/* Contenido del navbar */}
-      <div className="relative z-10 flex items-center p-6">
-        {/* Logo/Título */}
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center transform hover:rotate-12 transition-transform duration-300">
-            <span className="text-xl font-bold">💥</span>
-          </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            Sistema de Rollos MTT
-          </h1>
-        </div>
-
-        {/* Links de navegación */}
-        <div className="flex items-center space-x-2 ml-8">
-          {navItems.map((item, index) => (
-            <div
-              key={item.path}
-              className={`transform transition-all duration-500 ${
-                mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-              }`}
-              style={{ transitionDelay: `${index * 100}ms` }}
-            >
-              <NavLink
-                to={item.path}
-                isActive={location.pathname === item.path}
-              >
-                <span>{item.label}</span>
-              </NavLink>
+    !isClientDashboard && (
+      <nav className="relative mb-8">
+        {/* Fondo con efecto glassmorphism */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-lg rounded-2xl border border-white/10"></div>
+        
+        {/* Contenido del navbar */}
+        <div className="relative z-10 flex items-center p-6">
+          {/* Logo/Título */}
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center transform hover:rotate-12 transition-transform duration-300">
+              <span className="text-xl font-bold">🧵</span>
             </div>
-          ))}
-        </div>
-      </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              Sistema de Rollos MTT
+            </h1>
+          </div>
 
-      {/* Indicador de página activa */}
-      <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-        <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full animate-pulse"></div>
-      </div>
-    </nav>
+          {/* Links de navegación */}
+          <div className="flex items-center space-x-2 ml-8">
+            {navItems.map((item, index) => (
+              <div
+                key={item.path}
+                className={`transform transition-all duration-500 ${
+                  mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+                }`}
+                style={{ transitionDelay: `${index * 100}ms` }}
+              >
+                <NavLink
+                  to={item.path}
+                  isActive={location.pathname === item.path}
+                >
+                  <span>{item.label}</span>
+                </NavLink>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Indicador de página activa */}
+        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+          <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full animate-pulse"></div>
+        </div>
+      </nav>
+    )
   );
 }
 
@@ -100,9 +112,23 @@ export default function AppRouter() {
           {/* Contenedor de páginas con animación */}
           <div className="transition-all duration-300 ease-in-out">
             <Routes>
-              <Route path="/" element={<Agregar />} />
+              {/* Ruta principal redirige a clientes */}
+              <Route path="/" element={<ClientesPage />} />
+              
+              {/* Rutas principales */}
+              <Route path="/clientes" element={<ClientesPage />} />
+              <Route path="/clientes/nuevo" element={<ClienteManager />} />
+              <Route path="/agregar" element={<Agregar />} />
               <Route path="/consultar" element={<Consultar />} />
               <Route path="/cortes" element={<CortesPage />} />
+              
+              {/* Rutas para cada cliente */}
+              <Route path="/cliente/:clienteId" element={<ClienteDashboard />}>
+                <Route index element={<RolloList />} />
+                <Route path="rollos" element={<RolloList />} />
+                <Route path="agregar" element={<RolloForm />} />
+                <Route path="cortes" element={<Cortes />} />
+              </Route>
             </Routes>
           </div>
         </div>

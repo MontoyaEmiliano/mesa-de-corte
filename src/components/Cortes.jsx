@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
-
-axios.defaults.baseURL = "http://localhost:8000";
-axios.defaults.headers.common["Content-Type"] = "application/json";
-axios.defaults.headers.common["Accept"] = "application/json";
+import { rollosApi } from "../api/rollosApi";
+import { useParams } from "react-router-dom";
 
 export default function Cortes() {
+  const { clienteId } = useParams();
   const [tipoTela, setTipoTela] = useState("");
   const [color, setColor] = useState("");
   const [metrosRequeridos, setMetrosRequeridos] = useState("");
@@ -27,7 +25,7 @@ export default function Cortes() {
   useEffect(() => {
     const fetchRollos = async () => {
       try {
-        const res = await axios.get("/rollos/");
+        const res = await rollosApi.fetchRollos(clienteId);
         setRollos(res.data);
         
         // Extraer tipos de tela únicos
@@ -42,7 +40,7 @@ export default function Cortes() {
       }
     };
     fetchRollos();
-  }, []);
+  }, [clienteId]);
 
   const handleTipoTelaChange = (e) => {
     const valor = e.target.value;
@@ -190,10 +188,11 @@ export default function Cortes() {
     try {
       for (const rollo of rollosUsados) {
         const numeroEditado = numerosEditados[rollo.id];
-        await axios.put(`/rollos/${rollo.id}/`, {
+        await rollosApi.updateRollo(rollo.id, {
           ...rollo,
           numero_rollo: numeroEditado,
-          disponible: false
+          disponible: false,
+          cliente_id: clienteId
         });
       }
       setResultado("✅ Rollos marcados como no disponibles.");
@@ -203,7 +202,7 @@ export default function Cortes() {
       setTipoTela("");
       setColor("");
       setMetrosRequeridos("");
-      const res = await axios.get("/rollos/");
+      const res = await rollosApi.fetchRollos(clienteId);
       setRollos(res.data);
     } catch (error) {
       console.error("Error al actualizar rollos:", error);
