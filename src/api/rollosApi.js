@@ -59,7 +59,7 @@ export const rollosApi = {
   
   deleteCliente: (id) => api.delete(`/clientes/${id}/`),
   
-  fetchRollosCliente: (clienteId, disponible = null) => api.get(`/clientes/${clienteId}/rollos/`, {
+  fetchRollosCliente: (clienteId, disponible = null) => api.get(`/api/clientes/${clienteId}/rollos/`, {
     params: disponible !== null ? { disponible: disponible.toString() } : {}
   }),
 

@@ -30,7 +30,7 @@ export default function ListaRollos() {
   const cargarDatos = async () => {
     try {
       const [rollosResponse, clientesResponse] = await Promise.all([
-        rollosApi.fetchRollos(clienteId),
+        rollosApi.fetchRollosCliente(clienteId), // CORREGIDO: usar fetchRollosCliente
         rollosApi.fetchClientes()
       ]);
       
