@@ -30,13 +30,15 @@ export default function ListaRollos() {
   const cargarDatos = async () => {
     try {
       const [rollosResponse, clientesResponse] = await Promise.all([
-        rollosApi.fetchRollosCliente(clienteId), // CORREGIDO: usar fetchRollosCliente
+        rollosApi.fetchRollosCliente(clienteId),
         rollosApi.fetchClientes()
       ]);
       
       const rollosNormalizados = rollosResponse.data.map(rollo => ({
         ...rollo,
-        disponible: rollo.disponible !== false
+        disponible: rollo.disponible !== false,
+        resto_limpio: rollo.resto_limpio || 0,
+        resto_sucio: rollo.resto_sucio || 0
       }));
       
       setRollos(rollosNormalizados);
@@ -177,7 +179,9 @@ export default function ListaRollos() {
     setRolloEditado({ 
       ...rollo,
       disponible: rollo.disponible !== false,
-      cliente_id: clienteId // Usamos el clienteId de la URL
+      resto_limpio: rollo.resto_limpio || 0,
+      resto_sucio: rollo.resto_sucio || 0,
+      cliente_id: clienteId
     });
   };
 
@@ -191,6 +195,8 @@ export default function ListaRollos() {
       await rollosApi.updateRollo(editando, {
         ...rolloEditado,
         metraje: parseFloat(rolloEditado.metraje),
+        resto_limpio: parseFloat(rolloEditado.resto_limpio) || 0,
+        resto_sucio: parseFloat(rolloEditado.resto_sucio) || 0,
         disponible: rolloEditado.disponible === true,
         cliente_id: parseInt(clienteId)
       });
@@ -286,11 +292,13 @@ export default function ListaRollos() {
             <tr>
               <th className="p-3">#</th>
               <th className="p-3">Número</th>
-              <th className="p-3">Lote</th>
+              <th className="p-3">Factura</th>
               <th className="p-3">Tipo Tela</th>
               <th className="p-3">Color</th>
               <th className="p-3">Fecha</th>
               <th className="p-3">Metraje</th>
+              <th className="p-3">Resto Limpio</th>
+              <th className="p-3">Resto Sucio</th>
               <th className="p-3">Disponible</th>
               <th className="p-3">Acciones</th>
             </tr>
@@ -359,6 +367,28 @@ export default function ListaRollos() {
                     </td>
                     <td className="p-2">
                       <input
+                        type="number"
+                        name="resto_limpio"
+                        value={rolloEditado.resto_limpio || ''}
+                        onChange={handleInputChange}
+                        className="w-full p-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                        step="0.1"
+                        min="0"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="number"
+                        name="resto_sucio"
+                        value={rolloEditado.resto_sucio || ''}
+                        onChange={handleInputChange}
+                        className="w-full p-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                        step="0.1"
+                        min="0"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
                         type="checkbox"
                         name="disponible"
                         checked={rolloEditado.disponible || false}
@@ -395,6 +425,16 @@ export default function ListaRollos() {
                     </td>
                     <td className="p-3">{rollo.fecha}</td>
                     <td className="p-3">{rollo.metraje} m</td>
+                    <td className="p-3">
+                      <span className="px-2 py-1 bg-blue-600 rounded-full text-sm">
+                        {rollo.resto_limpio || 0} m
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className="px-2 py-1 bg-orange-600 rounded-full text-sm">
+                        {rollo.resto_sucio || 0} m
+                      </span>
+                    </td>
                     <td className="p-3">
                       <span className={`px-2 py-1 rounded-full text-sm ${
                         rollo.disponible ? 'bg-green-600' : 'bg-red-600'
